@@ -12,9 +12,7 @@ SOURCE = <<EOS
 <html>
     <head>
         <meta charset="UTF-8">
-        <title>영상의학과 검사</title>
-        <link href="./kendoui/examples/shared/styles/examples.css" rel="stylesheet"/>
-        <link href="./kendoui/examples/shared/styles/examples-offline.css" rel="stylesheet"/>
+        <title>QtKendoGraph</title>
         <link href="./kendoui/styles/kendo.common.css" rel="stylesheet"/>
         <link href="./kendoui/styles/kendo.default.css" rel="stylesheet"/>
         <script src="./kendoui/js/jquery.min.js"></script>
@@ -28,16 +26,16 @@ SOURCE = <<EOS
                 <div id="chart"></div>
             </div>
             <script>
-                function createChart() {
+                function lineChart(d) {
                     $("#chart").kendoChart({
                         title: {
-                            text: "미래병원 영상의학검사"
+                            text: d.title
                         },
                         dataSource: new kendo.data.DataSource(
                           {
                             transport: {
                              read: {
-                               url: "http://127.0.0.1:8080/mr_stats.json",
+                               url: "http://127.0.0.1:8080/us_stats.json",
                                dataType: "json"
                              }
                             }
@@ -46,10 +44,12 @@ SOURCE = <<EOS
                         legend: {
                             position: "bottom"
                         },
+                        seriesDefaults: {
+                            type: "line"
+                        },
                         series: [{
-                            type: "line",
                             field: "count",
-                            name: "매달 count"
+                            name: "검사 건수"
                         }],
                         categoryAxis: {
                             field: "month"
@@ -63,10 +63,54 @@ SOURCE = <<EOS
                     });
                 }
 
-                function pieChart(c) {
+                function columnChart(d) {
                     $("#chart").kendoChart({
                         title: {
-                            text: "미래병원 영상의학검사"
+                            text: d.title
+                        },
+                        dataSource: new kendo.data.DataSource(
+                          {
+                            transport: {
+                             read: {
+                               url: "http://127.0.0.1:8080/stacked_stats.json",
+                               dataType: "json"
+                             }
+                            }
+                          }
+                        ),
+                        legend: {
+                            position: "bottom"
+                        }, 
+                        seriesDefaults: {
+                            type: "column",
+                            stack: true
+                        },
+                        series: [{
+                            field: "ABD",
+                            name: "복부"
+                        }, {
+                            field: "HEART",
+                            name: "심장"
+                        }, {
+                            field: "MS",
+                            name: "근골격"
+                        }, {
+                            field: "THYROID",
+                            name: "갑상선"
+                        }],
+                        categoryAxis: {
+                            field: "month"
+                        },
+                        tooltip: {
+                            visible: true
+                        }
+                    });
+                }
+
+                function pieChart(d) {
+                    $("#chart").kendoChart({
+                        title: {
+                            text: d.title
                         },
                         dataSource: new kendo.data.DataSource(
                           {
@@ -75,7 +119,7 @@ SOURCE = <<EOS
                                url: "http://127.0.0.1:8080/sub_stats.json",
                                dataType: "json",
                                data: {
-                                 q: c
+                                 q: d.category
                                }
                              }
                             }
@@ -97,15 +141,6 @@ SOURCE = <<EOS
                         }
                     });
                 }
-
-                $(document).ready(function() {
-                    setTimeout(function() {
-                        createChart();
-
-                        // Initialize the chart with a delay to make sure
-                        // the initial animation is visible
-                    }, 400);
-                });
             </script>
         </div>
     </body>
@@ -113,7 +148,7 @@ SOURCE = <<EOS
 EOS
 
 class MyWidget < Qt::Widget
-  slots :add_js_object, 'notify_select(QString)', :quit, :pie
+  slots :add_js_object, 'notify_select(QString)', :quit, :pie, :stacked, 'run_java_script(bool)'
   
   def initialize(parent = nil, http_server)
     super(parent)
@@ -123,17 +158,25 @@ class MyWidget < Qt::Widget
 	
     pie = Qt::PushButton.new('파이 차트', self)
     connect(pie, SIGNAL('clicked()'), self, SLOT('pie()'))
+    stack = Qt::PushButton.new('컬럼 차트', self)
+    connect(stack, SIGNAL('clicked()'), self, SLOT('stacked()'))
+
     quit = Qt::PushButton.new('종료', self)
     connect(quit, SIGNAL('clicked()'), self, SLOT('quit()'))
 	
     layout = Qt::VBoxLayout.new
     layout.addWidget(@web)
+    hlayout = Qt::HBoxLayout.new
+    hlayout.addWidget(pie)
+    hlayout.addWidget(stack)
+    layout.addLayout(hlayout)
     layout.addWidget(quit)
     setLayout(layout)
     
     base = Qt::Url.fromLocalFile("#{Dir.getwd}/")
 	  @web.set_html(SOURCE, base)
 	  connect(@web.page.mainFrame, SIGNAL('javaScriptWindowObjectCleared()'), self, SLOT('add_js_object()'))
+	  connect(@web.page.mainFrame, SIGNAL('loadFinished(bool)'), self, SLOT('run_java_script(bool)'))
   end
 
   def add_js_object()
@@ -141,7 +184,17 @@ class MyWidget < Qt::Widget
   end
   
   def pie()
-    @web.page.mainFrame.evaluate_java_script('pieChart("2012-01")')
+    @web.page.mainFrame.evaluate_java_script('pieChart({title:"세부 항목", category:"2012-01"})')
+  end
+  
+  def stacked()
+    p 'stacked'    
+    @web.page.mainFrame.evaluate_java_script('columnChart({title:"세부 항목"})')
+  end
+  
+  def run_java_script(success)
+    p "run javascript"
+    @web.page.mainFrame.evaluate_java_script('$(document).ready(function() { lineChart({title:"초음파 검사", seriesName:"매달 count"}); });')
   end
   
   def notify_select(n)
@@ -159,7 +212,28 @@ class Stats
   def call(env)
     # "Access-Control-Allow-Origin : *" is required to ovoid Origin null not allowed problem, EUREKA!
     [200, {"Content-Type"=>"application/json", "Access-Control-Allow-Origin"=>"*"}, 
-      [JSON.generate(Exam.filter(:modality=>'US').group_and_count(:strftime.sql_function("%Y년%m월", :sdate).as(:month)).map { |x| x.values})]]
+    # [JSON.generate(Exam.join(Study, :id=>:sid).filter(:modality=>'US').group_and_count(:strftime.sql_function("%Y%m", :sdate).as(:month)).order(:month).map { |x| x.values })]]
+    [JSON.generate(Exam.filter(:modality=>'US').group_and_count(:strftime.sql_function("%Y년%m월", :sdate).as(:month)).map { |x| x.values})]]
+  end
+end
+
+class StackedStats
+  def restructure
+    r =  Exam.join(Study, :id=>:sid).filter(:modality=>'US').group_and_count(:strftime.sql_function("%Y%m", :sdate).as(:month), :studies__category).order(:month, :studies__category)
+    current_month = {}
+    result = []
+    r.each do |s|
+      if current_month[:month] != s.values[:month]
+        result << current_month if current_month.size > 0
+        current_month = {:month=>s.values[:month]}
+      end
+      current_month[s.values[:category]] = s.values[:count]
+    end
+    result << current_month
+  end
+  def call(env)
+    # "Access-Control-Allow-Origin : *" is required to ovoid Origin null not allowed problem, EUREKA!
+    [200, {"Content-Type"=>"application/json", "Access-Control-Allow-Origin"=>"*"}, [JSON.generate(restructure)]]
   end
 end
 
@@ -179,8 +253,11 @@ EM.run do
         [JSON.generate([{:category=>"MS", :value=>100}, {:category=>"ABD", :value=>200}, {:category=>"HEART", :value=>210}])]]
       }
     end
-    map '/mr_stats.json' do
+    map '/us_stats.json' do
       run Stats.new
+    end
+    map '/stacked_stats.json' do
+      run StackedStats.new
     end
   end
   
