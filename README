@@ -1,0 +1,7 @@
+This is a demo and small utility written for me.
+
+Qt application and Thin server are running within EventMachine's run loop. (qt_kendo)
+Qt application uses QtWebkit which loads kendoui javascript library.
+User can supply custom class for data. (see rad_info.rb)
+
+Kendoui Javascript library by Telerik.

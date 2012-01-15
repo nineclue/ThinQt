@@ -200,7 +200,7 @@ EOS
       
       @units = [:day, :week, :month, :quarter, :half, :year]
       @unit_list = Qt::ListWidget.new
-      ['일', '주', '월', '분기', '반기', '년'].each do |p|
+      ['day', 'week', 'month', 'quarter', 'half', 'year'].each do |p|
         Qt::ListWidgetItem.new(p, @unit_list)
       end
       @unit_list.currentRow = 0
@@ -218,7 +218,7 @@ EOS
         connect(stacked, SIGNAL('toggled(bool)'), self, SLOT('enable_redraw()'))
       end
       
-      quit = Qt::PushButton.new('종료', self)
+      quit = Qt::PushButton.new('Quit', self)
       connect(quit, SIGNAL('clicked()'), self, SLOT('quit()'))
 
       grid = Qt::GridLayout.new
@@ -370,7 +370,7 @@ EOS
     def draw
       @redraw.enabled = false
       if @stacked_graph
-        p parameters = js_object(:seriesInfo=>'[{field: "ABD", name: "복부"}, {field: "HEART", name: "심장"}, {field: "MS", name: "근골격"}, {field: "THYROID", name: "갑상선"}]')
+        p parameters = js_object(:seriesInfo=>'[{field: "ABD", name: "Abdomen"}, {field: "HEART", name: "Heart"}, {field: "MS", name: "Musculoskeletal"}, {field: "THYROID", name: "Thyroid"}]')
         @web.page.mainFrame.evaluate_java_script("stackedChart(#{parameters})")        
       else
         parameters = js_object
@@ -386,7 +386,6 @@ EOS
     # make javascript object string according to type, start_date, end_date, unit
     # parameter period is for sub_query
     def js_object(args={})
-      # period = 'period:"' + period + '", ' unless period.size == 0
       params = ''
       args.each_pair do |k, v|
         params += "#{k}:#{v}, "
@@ -403,13 +402,11 @@ EOS
     end
   
     def draw_pie(n)      
-  	  # p "노드가 선택되었습니다. 근데 과연 노티될까요? #{n.class} : #{n}"
       parameters = js_object(:period=>"\"#{n}\"")
       @web.page.mainFrame.evaluate_java_script("pieChart(#{parameters})")
     end
   
     def quit()
-      # Qt::Application.instance.quit
       @http_server.stop!
       EM.next_tick { EM.stop }
     end

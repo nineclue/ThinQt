@@ -22,19 +22,6 @@ class Study < Sequel::Model
   one_to_many :exams, :primary_key=>:id, :key=>:sid
 end
 
-# Exam.filter(:modality=>'MR').group_and_count(:strftime.sql_function("%Y%m", :sdate).as(:month)).all
-# Exam.filter(:modality=>'MR').group_and_count(:strftime.sql_function("%Y%m", :sdate).as(:month)).order(:month).reverse.map { |x| x.values }
-# Exam.join(Study, :id=>:sid).filter(:modality=>'US').group_and_count(:strftime.sql_function("%Y%m", :sdate).as(:month), :studies__category).order(:month).reverse.all
-# Exam.join(Study, :id=>:sid).filter(:modality=>'MR').group_and_count(:strftime.sql_function("%Y%m", :sdate).as(:month), :studies__category).order(:month).reverse.map { |x| x.values }
-# 분기별 통계
-# Exam.filter(:modality=>'US').group_and_count((:strftime.sql_function("%Y", :sdate)+'-'+((:strftime.sql_function("%m", :sdate)-1)/3(단위)+1)).as(:period)).all
-# 2011년 3분기 항목별 통계
-# Exam.join(Study, :id=>:sid).filter(:modality=>'US').group_and_count((:strftime.sql_function("%Y", :sdate)+'-'+((:strftime.sql_function("%m", :sdate)-1)/3+1)).as(:period), :studies__category).having(:period=>'2011-3').all
-# 2011년 3, 4분기 항목별 통계 - 기간
-# Exam.join(Study, :id=>:sid).filter(:modality=>'US').group_and_count((:strftime.sql_function("%Y", :sdate)+'-'+((:strftime.sql_function("%m", :sdate)-1)/3+1)).as(:period), :studies__category).where(:period=>'2011-3'..'2011-4').all
-# -> SQL
-# "SELECT (strftime('%Y', `sdate`) || '-' || (((strftime('%m', `sdate`) - 1) / 3) + 1)) AS 'period', `studies`.`category`, count(*) AS 'count' FROM `exams` INNER JOIN `studies` ON (`studies`.`id` = `exams`.`sid`) WHERE ((`modality` = 'US') AND (`period` >= '2011-3') AND (`period` <= '2011-4')) GROUP BY (strftime('%Y', `sdate`) || '-' || (((strftime('%m', `sdate`) - 1) / 3) + 1)), `studies`.`category`
-
 class RadInfo
   # range of date
   # [min, max] or min format (max is set to today)
@@ -44,7 +31,7 @@ class RadInfo
   
   # list of possible data types, [ [:description, :type], ... ]
   def types
-    [ ['초음파 검사', :us], ['MR 검사', :mr] ]
+    [ ['Ultralound Studies', :us], ['MR Studies', :mr] ]
   end
   
   # query data between start, end dates : for line graph
@@ -82,7 +69,6 @@ class RadInfo
   def add_period(dataset, unit, extra_field = nil)
     case unit.to_sym
     when :day
-      # groups.insert(0, :strftime.sql_function("%Y-%m-%d", :sdate).as(:peroid))
       if extra_field.nil?
         dataset.group_and_count(:strftime.sql_function("%Y-%m-%d", :sdate).as(:period))
       else
@@ -119,7 +105,6 @@ class RadInfo
         dataset.group_and_count(:strftime.sql_function("%Y", :sdate).as(:period), extra_field)
       end
     end
-    # dataset.send(:group_and_count, groups)
   end
 end
 
